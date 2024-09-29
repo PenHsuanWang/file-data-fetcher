@@ -21,12 +21,13 @@ class BaseFileFetchHandler(ABC):
 
     def __init__(self, processed_registry: 'ProcessedFilesRegistry') -> None:
         """
-        Initialize the BaseFileFetchHandler with the processed registry.
+        Initialize the BaseFileFetchHandler with the processed registry and logger.
 
         :param processed_registry: An instance of the processed files registry.
         :type processed_registry: ProcessedFilesRegistry
         """
         self.processed_registry = processed_registry
+        self.logger = setup_logger()  # Initialize the logger here
 
     def is_file_ready(self, file_path: str) -> bool:
         """
@@ -43,7 +44,7 @@ class BaseFileFetchHandler(ABC):
             new_size = os.path.getsize(file_path)
             return initial_size == new_size
         except Exception as e:
-            logger.error(f"Error checking file readiness: {e}")
+            self.logger.error(f"Error checking file readiness: {e}")
             return False
 
     def calculate_checksum(self, file_path: str) -> Optional[str]:
@@ -62,7 +63,7 @@ class BaseFileFetchHandler(ABC):
                     hash_md5.update(chunk)
             return hash_md5.hexdigest()
         except Exception as e:
-            logger.error(f"Error calculating checksum for {file_path}: {e}")
+            self.logger.error(f"Error calculating checksum for {file_path}: {e}")
             return None
 
     @abstractmethod
@@ -88,16 +89,16 @@ class BaseFileFetchHandler(ABC):
         """
         filename = os.path.basename(file_path)
         if self.processed_registry.is_processed(filename):
-            logger.info(f"File {filename} already processed.")
+            self.logger.info(f"File {filename} already processed.")
             return
 
         if not self.is_file_ready(file_path):
-            logger.info(f"File {filename} is not ready. Will retry later.")
+            self.logger.info(f"File {filename} is not ready. Will retry later.")
             return
 
         checksum = self.calculate_checksum(file_path)
         if not checksum:
-            logger.error(f"Failed to calculate checksum for {filename}.")
+            self.logger.error(f"Failed to calculate checksum for {filename}.")
             return
 
         try:
@@ -109,10 +110,10 @@ class BaseFileFetchHandler(ABC):
                     validated_record = DataRecord(**record).dict()
                     validated_records.append(validated_record)
                 except ValidationError as e:
-                    logger.error(f"Validation error for record {record}: {e}")
+                    self.logger.error(f"Validation error for record {record}: {e}")
             if validated_records:
                 return validated_records, filename, checksum
             else:
-                logger.info(f"No valid records found in {filename}.")
+                self.logger.info(f"No valid records found in {filename}.")
         except Exception as e:
-            logger.error(f"Failed to process file {file_path}: {e}")
+            self.logger.error(f"Failed to process file {file_path}: {e}")
