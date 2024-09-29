@@ -1,4 +1,4 @@
-# src/handlers/file_handlers/csv_fetch_handler.py
+# handlers/file_handlers/excel_fetch_handler.py
 
 import pandas as pd
 import hashlib
@@ -8,7 +8,7 @@ from src.handlers.file_fetch_handlers.base_file_fetcher_handler import BaseFileF
 from models.data_record import DataRecord
 from utils.logger import logger
 
-class CSVFetchHandler(BaseFileFetchHandler):
+class ExcelFetchHandler(BaseFileFetchHandler):
     def __init__(self, processed_registry):
         self.processed_registry = processed_registry
 
@@ -51,7 +51,7 @@ class CSVFetchHandler(BaseFileFetchHandler):
             return
 
         try:
-            df = pd.read_csv(file_path)
+            df = pd.read_excel(file_path)
             records = df.to_dict(orient='records')
             validated_records = []
             for record in records:
@@ -61,9 +61,8 @@ class CSVFetchHandler(BaseFileFetchHandler):
                 except ValidationError as e:
                     logger.error(f"Validation error for record {record}: {e}")
             if validated_records:
-                # Return a tuple of records and file metadata
                 return validated_records, filename, checksum
             else:
                 logger.info(f"No valid records found in {filename}.")
         except Exception as e:
-            logger.error(f"Failed to process CSV file {file_path}: {e}")
+            logger.error(f"Failed to process Excel file {file_path}: {e}")
