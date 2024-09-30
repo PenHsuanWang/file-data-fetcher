@@ -9,6 +9,7 @@ import pandas as pd
 # Load environment variables from the .env file
 load_dotenv()
 
+
 class MongoDBHandler(BaseDBHandler):
     def __init__(self):
         # Call the base class to initialize the logger
