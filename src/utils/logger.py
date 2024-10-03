@@ -1,6 +1,8 @@
 # src/utils/logger.py
 import logging
 import os
+from logging.handlers import RotatingFileHandler
+
 
 def setup_logger():
     """
@@ -8,7 +10,7 @@ def setup_logger():
     Ensures logging only happens once for the entire app.
     """
     logger = logging.getLogger("app_logger")
-    
+
     # Set log level from environment variable or default to DEBUG
     log_level = os.getenv("LOG_LEVEL", "DEBUG").upper()
     logger.setLevel(getattr(logging, log_level, logging.DEBUG))
@@ -21,7 +23,7 @@ def setup_logger():
 
         # Create file handler for logging to a file
         log_file = os.getenv("LOG_FILE", "application.log")
-        fh = logging.FileHandler(log_file)
+        fh = RotatingFileHandler(log_file, maxBytes=10485760, backupCount=5)
         fh.setLevel(logging.ERROR)
 
         # Create a logging format

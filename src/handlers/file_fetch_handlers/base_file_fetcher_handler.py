@@ -4,7 +4,6 @@ from abc import ABC, abstractmethod
 import hashlib
 import time
 import os
-from src.models.data_record import DataRecord
 from src.utils.logger import setup_logger
 from pydantic import ValidationError
 import pandas as pd
@@ -19,14 +18,14 @@ class BaseFileFetchHandler(ABC):
     :type processed_registry: ProcessedFilesRegistry
     """
 
-    def __init__(self, processed_registry: 'ProcessedFilesRegistry') -> None:
+    def __init__(self, data_model) -> None:
         """
         Initialize the BaseFileFetchHandler with the processed registry and logger.
 
         :param processed_registry: An instance of the processed files registry.
         :type processed_registry: ProcessedFilesRegistry
         """
-        self.processed_registry = processed_registry
+        self.data_model = data_model
         self.logger = setup_logger()  # Initialize the logger here
 
     def is_file_ready(self, file_path: str) -> bool:
@@ -88,9 +87,6 @@ class BaseFileFetchHandler(ABC):
         :rtype: Optional[Tuple[List[dict], str, str]]
         """
         filename = os.path.basename(file_path)
-        if self.processed_registry.is_processed(filename):
-            self.logger.info(f"File {filename} already processed.")
-            return
 
         if not self.is_file_ready(file_path):
             self.logger.info(f"File {filename} is not ready. Will retry later.")
@@ -107,7 +103,7 @@ class BaseFileFetchHandler(ABC):
             validated_records = []
             for record in records:
                 try:
-                    validated_record = DataRecord(**record).dict()
+                    validated_record = self.data_model(**record).dict()
                     validated_records.append(validated_record)
                 except ValidationError as e:
                     self.logger.error(f"Validation error for record {record}: {e}")
