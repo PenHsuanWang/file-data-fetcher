@@ -28,6 +28,7 @@ def setup_test_environment():
         "age": [25, 30, 35],
         "city": ["New York", "San Francisco", "Los Angeles"]
     }
+    print("going to save csv file into folder")
     df_csv = pd.DataFrame(csv_data)
     csv_file_path = os.path.join(TEST_FOLDER, "sample.csv")
     df_csv.to_csv(csv_file_path, index=False)
@@ -46,6 +47,8 @@ def setup_test_environment():
     print(f"Sample Excel file created at: {excel_file_path}")
 
 
+import asyncio
+
 async def run_monitoring():
     """
     Function to run the file monitoring example. This function demonstrates how to monitor
@@ -63,6 +66,9 @@ async def run_monitoring():
         '.xls': ExcelFetchHandler,
         '.xlsx': ExcelFetchHandler
     }
+
+    # Get the event loop
+    loop = asyncio.get_event_loop()
 
     # Initialize the FolderMonitor to monitor the test folder
     folder_monitor = FolderMonitor(
@@ -83,7 +89,9 @@ def main():
     and starts the folder monitoring process.
     """
     # Step 1: Setup the test folder and create example CSV and Excel files
+    print("Going to setup test environment")
     setup_test_environment()
+    print("Successfully setup the environment")
 
     # Step 2: Start the asyncio event loop to monitor the test folder
     loop = asyncio.get_event_loop()

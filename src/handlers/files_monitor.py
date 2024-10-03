@@ -13,6 +13,7 @@ from src.utils.logger import setup_logger
 from src.handlers.db_handlers.base_db_handler import BaseDBHandler
 from typing import Dict, Callable
 
+
 class FileMonitorHandler(FileSystemEventHandler):
     """
     FileMonitorHandler handles the detection of new files and initiates
@@ -25,25 +26,30 @@ class FileMonitorHandler(FileSystemEventHandler):
     :type dry_run: bool
     :param file_handlers: A dictionary mapping file extensions to file handlers.
     :type file_handlers: Dict[str, Callable]
+    :param loop: The asyncio event loop to run coroutines.
     """
 
-    def __init__(self, db_handler: 'BaseDBHandler', dry_run: bool = False, file_handlers: Dict[str, Callable] = None) -> None:
+    def __init__(self, db_handler: 'BaseDBHandler', dry_run: bool = False, file_handlers: Dict[str, Callable] = None, loop=None) -> None:
         """
         Initializes the FileMonitorHandler.
 
         :param db_handler: The database handler used for saving processed data.
         :param dry_run: If set to True, only logs operations without committing data to the database.
         :param file_handlers: A dictionary mapping file extensions to handler classes.
+        :param loop: The asyncio event loop to run coroutines.
         """
         self.db_handler = db_handler
         self.logger = setup_logger()
         self.dry_run = dry_run
-        # Set up default file handlers if none are provided
         self.file_handlers = file_handlers or {
             ".csv": CSVFetchHandler,
             ".xls": ExcelFetchHandler,
             ".xlsx": ExcelFetchHandler,
         }
+
+        # Explicitly set a new event loop for the thread if one is not provided
+        self.loop = loop or asyncio.new_event_loop()
+        asyncio.set_event_loop(self.loop)  # Set the event loop for this thread
 
     def is_file_ready(self, file_path: str) -> bool:
         """
@@ -103,7 +109,8 @@ class FileMonitorHandler(FileSystemEventHandler):
             self.logger.info(f"File {file_path} is not ready. Will retry later.")
             return
 
-        asyncio.create_task(self.handle_file(file_path))  # Process file asynchronously
+        # Use run_coroutine_threadsafe to ensure file handling runs in the correct event loop
+        asyncio.run_coroutine_threadsafe(self.handle_file(file_path), self.loop)
 
 
 class FolderMonitor:
