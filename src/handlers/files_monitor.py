@@ -78,9 +78,20 @@ class FileMonitorHandler(FileSystemEventHandler):
         ext = os.path.splitext(file_path)[-1]
         handler_class = self.file_handlers.get(ext)
 
+        self.logger.info(f"Attempting to handle the file {file_path}")
+
         if handler_class is None:
             self.logger.warning(f"Unsupported file type: {file_path}")
             return
+
+        # Log file content if it's a CSV file
+        if ext == ".csv":
+            try:
+                self.logger.info(f"Reading content of CSV file: {file_path}")
+                df = pd.read_csv(file_path)  # Read the CSV file
+                self.logger.info(f"File content:\n{df.to_string(index=False)}")  # Print the content of the CSV file
+            except Exception as e:
+                self.logger.error(f"Error reading CSV file {file_path}: {e}")
 
         handler = handler_class()
         processed_data = handler.process_file(file_path)
@@ -100,6 +111,8 @@ class FileMonitorHandler(FileSystemEventHandler):
 
         :param event: The file system event object containing details about the created file.
         """
+        self.logger.info(f"File event detected: {event.src_path}")
+
         if event.is_directory:
             return
 
@@ -110,6 +123,7 @@ class FileMonitorHandler(FileSystemEventHandler):
             return
 
         # Use run_coroutine_threadsafe to ensure file handling runs in the correct event loop
+        self.logger.info(f"File {file_path} is ready. Processing it...")
         asyncio.run_coroutine_threadsafe(self.handle_file(file_path), self.loop)
 
 
@@ -165,6 +179,8 @@ class FolderMonitor:
         observer = Observer()
         observer.schedule(event_handler, self.folder_to_monitor, recursive=False)
         observer.start()
+
+        self.logger.info(f"Observer started. Waiting for file events in {self.folder_to_monitor}...")
 
         try:
             while True:
