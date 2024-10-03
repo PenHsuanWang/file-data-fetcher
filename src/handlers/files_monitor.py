@@ -82,7 +82,7 @@ class FileMonitorHandler(FileSystemEventHandler):
             self.logger.warning(f"Unsupported file type: {file_path}")
             return
 
-        # Log file content if it's a CSV file
+        # Log file content if it's a CSV or Excel file
         if ext == ".csv":
             try:
                 self.logger.info(f"Reading content of CSV file: {file_path}")
@@ -90,6 +90,14 @@ class FileMonitorHandler(FileSystemEventHandler):
                 self.logger.info(f"File content:\n{df.to_string(index=False)}")  # Print the content of the CSV file
             except Exception as e:
                 self.logger.error(f"Error reading CSV file {file_path}: {e}")
+                return
+        elif ext in [".xls", ".xlsx"]:
+            try:
+                self.logger.info(f"Reading content of Excel file: {file_path}")
+                df = pd.read_excel(file_path)  # Read the Excel file
+                self.logger.info(f"File content:\n{df.to_string(index=False)}")  # Print the content of the Excel file
+            except Exception as e:
+                self.logger.error(f"Error reading Excel file {file_path}: {e}")
                 return
 
         # Process the file with the correct handler
@@ -104,6 +112,8 @@ class FileMonitorHandler(FileSystemEventHandler):
                 # Convert the list of dicts into a DataFrame before saving
                 df = pd.DataFrame(records)
                 self.db_handler.save_data(df)
+        else:
+            self.logger.info(f"No data processed for file {file_path}.")
 
     def on_created(self, event: 'FileSystemEvent') -> None:
         """
