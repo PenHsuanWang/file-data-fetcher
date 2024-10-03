@@ -27,7 +27,7 @@ def check_folder_exists():
 
 async def run_monitoring():
     """
-    Function to run the file monitoring system, which monitors for CSV and Excel file creations.
+    Function to run the file monitoring example.
     """
     # Initialize logger
     logger = setup_logger()
@@ -42,20 +42,18 @@ async def run_monitoring():
         '.xlsx': ExcelFetchHandler
     }
 
-    # Get the event loop
-    loop = asyncio.get_event_loop()
-
     # Initialize the FolderMonitor to monitor the test folder
     folder_monitor = FolderMonitor(
         folder_to_monitor=TEST_FOLDER,
         poll_interval=2,  # Polling interval in seconds
         db_handler=db_handler,
         dry_run=True,  # Dry-run mode for testing (no actual DB insertion)
-        file_handlers=file_handlers
+        file_handlers=file_handlers,
+        loop=asyncio.get_running_loop()  # Pass the event loop
     )
 
-    # Run folder monitoring in a separate thread
-    await asyncio.to_thread(folder_monitor.start_monitoring)
+    # Start monitoring the folder asynchronously
+    await folder_monitor.start_monitoring()
 
 
 def main():

@@ -4,6 +4,7 @@ import os
 import time
 import pandas as pd
 import asyncio
+import threading
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileSystemEvent
 from pandas import DataFrame
@@ -29,14 +30,14 @@ class FileMonitorHandler(FileSystemEventHandler):
     :param loop: The asyncio event loop to run coroutines.
     """
 
-    def __init__(self, db_handler: 'BaseDBHandler', dry_run: bool = False, file_handlers: Dict[str, Callable] = None, loop=None) -> None:
+    def __init__(self, db_handler: 'BaseDBHandler', dry_run: bool = False,
+                 file_handlers: Dict[str, Callable] = None, loop=None) -> None:
         """
         Initializes the FileMonitorHandler.
 
         :param db_handler: The database handler used for saving processed data.
         :param dry_run: If set to True, only logs operations without committing data to the database.
         :param file_handlers: A dictionary mapping file extensions to handler classes.
-        :param loop: The asyncio event loop to run coroutines.
         """
         self.db_handler = db_handler
         self.logger = setup_logger()
@@ -46,10 +47,7 @@ class FileMonitorHandler(FileSystemEventHandler):
             ".xls": ExcelFetchHandler,
             ".xlsx": ExcelFetchHandler,
         }
-
-        # Explicitly set a new event loop for the thread if one is not provided
-        self.loop = loop or asyncio.new_event_loop()
-        asyncio.set_event_loop(self.loop)  # Set the event loop for this thread
+        self.loop = loop or asyncio.get_event_loop()
 
     def is_file_ready(self, file_path: str) -> bool:
         """
@@ -92,7 +90,9 @@ class FileMonitorHandler(FileSystemEventHandler):
                 self.logger.info(f"File content:\n{df.to_string(index=False)}")  # Print the content of the CSV file
             except Exception as e:
                 self.logger.error(f"Error reading CSV file {file_path}: {e}")
+                return
 
+        # Process the file with the correct handler
         handler = handler_class()
         processed_data = handler.process_file(file_path)
 
@@ -108,7 +108,6 @@ class FileMonitorHandler(FileSystemEventHandler):
     def on_created(self, event: 'FileSystemEvent') -> None:
         """
         Event handler triggered when a new file is created in the monitored directory.
-
         :param event: The file system event object containing details about the created file.
         """
         self.logger.info(f"File event detected: {event.src_path}")
@@ -122,8 +121,9 @@ class FileMonitorHandler(FileSystemEventHandler):
             self.logger.info(f"File {file_path} is not ready. Will retry later.")
             return
 
-        # Use run_coroutine_threadsafe to ensure file handling runs in the correct event loop
         self.logger.info(f"File {file_path} is ready. Processing it...")
+
+        # Schedule the asynchronous task in a thread-safe manner using run_coroutine_threadsafe
         asyncio.run_coroutine_threadsafe(self.handle_file(file_path), self.loop)
 
 
@@ -149,7 +149,7 @@ class FolderMonitor:
     """
 
     def __init__(self, folder_to_monitor: str, poll_interval: int, db_handler: 'BaseDBHandler',
-                 dry_run: bool = False, file_handlers: Dict[str, Callable] = None) -> None:
+                 dry_run: bool = False, file_handlers: Dict[str, Callable] = None, loop=None) -> None:
         """
         Initializes the FolderMonitor with folder monitoring settings.
 
@@ -165,26 +165,22 @@ class FolderMonitor:
         self.logger = setup_logger()
         self.dry_run = dry_run
         self.file_handlers = file_handlers
+        self.loop = loop or asyncio.get_event_loop()
 
-    def start_monitoring(self) -> None:
+    async def start_monitoring(self) -> None:
         """
         Starts the folder monitoring process by setting up a `watchdog.Observer`.
-
-        Continuously monitors the folder at the specified interval for file creation events
-        and delegates file processing to the `FileMonitorHandler`. Stops monitoring if a
-        `KeyboardInterrupt` is raised.
         """
         self.logger.info(f"Monitoring folder: {self.folder_to_monitor}")
-        event_handler = FileMonitorHandler(self.db_handler, dry_run=self.dry_run, file_handlers=self.file_handlers)
+        event_handler = FileMonitorHandler(self.db_handler, dry_run=self.dry_run,
+                                           file_handlers=self.file_handlers, loop=self.loop)
         observer = Observer()
         observer.schedule(event_handler, self.folder_to_monitor, recursive=False)
         observer.start()
 
-        self.logger.info(f"Observer started. Waiting for file events in {self.folder_to_monitor}...")
-
         try:
             while True:
-                time.sleep(self.poll_interval)
+                await asyncio.sleep(self.poll_interval)
         except KeyboardInterrupt:
             self.logger.info("Shutting down folder monitoring...")
             observer.stop()
